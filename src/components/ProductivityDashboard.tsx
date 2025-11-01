@@ -11,15 +11,8 @@ import RegisterCollaborator from './RegisterCollaborator';
 import CollaboratorList from './CollaboratorList';
 import ProjectStatus from './ProjectStatus';
 
+import { RawData, Collaborator } from '../types'; // Importar tipos centralizados
 import { projectPlan as initialProjectPlan } from '../data/projectPlan';
-
-// A interface RawData deve corresponder à estrutura das suas planilhas
-interface RawData { [key: string]: any; }
-
-interface Collaborator {
-  name: string;
-  area: string;
-}
 
 const formatDate = (date: Date) => date.toISOString().split('T')[0];
 
