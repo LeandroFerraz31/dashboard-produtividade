@@ -14,7 +14,7 @@ export const useProductivityData = (
   startDate: string,
   endDate: string,
   selectedCollaborator: string,
-  collaborators: Collaborator[]
+  collaborators: Collaborator[],
 ) => {
 
   const data = useMemo(() => {
@@ -43,7 +43,8 @@ export const useProductivityData = (
     const totalDays = new Set(filteredData.map(item => item.date)).size;
     const grandTotalItems = data.reduce((sum, item) => sum + item.items, 0);
     
-    const hoursPerDay = 8.8;
+    // 8 horas e 48 minutos = 8.8 horas
+    const hoursPerDay = 8.8; 
 
     return {
       totalItems,
@@ -64,10 +65,42 @@ export const useProductivityData = (
       grouped[item.date] += item.items;
     });
 
-    return Object.entries(grouped).map(([date, items]) => ({
-      date: new Date(date).toLocaleDateString('pt-BR', { day: '2-digit', month: '2-digit' }),
-      items,
-    }));
+    // Ordena as entradas pela data (chave do objeto) em ordem cronológica.
+    // A data está no formato 'AAAA-MM-DD', então a ordenação de string funciona perfeitamente.
+    return Object.entries(grouped)
+      .sort((a, b) => a[0].localeCompare(b[0]))
+      .map(([date, items]) => ({
+        date: new Date(date).toLocaleDateString('pt-BR', { day: '2-digit', month: '2-digit', timeZone: 'UTC' }),
+        items,
+      }));
+  }, [filteredData]);
+
+  // Agrupa os dados por colaborador e por dia para o gráfico de evolução.
+  const dailyCollaboratorData = useMemo(() => {
+    // Primeiro, agrupa todos os itens por data e colaborador.
+    const groupedByCollaboratorAndDate: { [collaborator: string]: { [date: string]: number } } = {};
+
+    filteredData.forEach(item => {
+      if (!groupedByCollaboratorAndDate[item.collaborator]) {
+        groupedByCollaboratorAndDate[item.collaborator] = {};
+      }
+      if (!groupedByCollaboratorAndDate[item.collaborator][item.date]) {
+        groupedByCollaboratorAndDate[item.collaborator][item.date] = 0;
+      }
+      groupedByCollaboratorAndDate[item.collaborator][item.date] += item.items;
+    });
+
+    // Pega todas as datas únicas no período e as ordena.
+    const allDates = Array.from(new Set(filteredData.map(item => item.date))).sort();
+
+    // Transforma os dados para o formato do gráfico.
+    return allDates.map(date => {
+      const entry: { [key: string]: any } = { date: new Date(date).toLocaleDateString('pt-BR', { day: '2-digit', month: '2-digit', timeZone: 'UTC' }) };
+      Object.keys(groupedByCollaboratorAndDate).forEach(collaborator => {
+        entry[collaborator] = groupedByCollaboratorAndDate[collaborator][date] || 0;
+      });
+      return entry;
+    });
   }, [filteredData]);
 
   // Agrupa os dados por categoria para o gráfico de distribuição.
@@ -116,6 +149,7 @@ export const useProductivityData = (
     dailyData, 
     categoryData, 
     collaboratorComparison, 
-    collaboratorNames 
+    collaboratorNames,
+    dailyCollaboratorData,
   };
 };

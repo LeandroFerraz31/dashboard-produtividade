@@ -2,17 +2,21 @@ import { LineChart, Line, XAxis, YAxis, CartesianGrid, Tooltip, Legend, Responsi
 import { MousePointer2 } from 'lucide-react';
 
 interface ProductivityData {
-  date: string;
-  items: number;
+  date: string; // Formato 'DD/MM'
+  [collaborator: string]: number | string; // Nomes dos colaboradores como chaves
 }
 
 interface ProductivityChartProps {
   data: ProductivityData[];
+  collaborators: string[];
 }
 
-const ProductivityChart: React.FC<ProductivityChartProps> = ({ data }) => {
+// Paleta de cores para as linhas do gráfico
+const COLORS = ['#3b82f6', '#10b981', '#ef4444', '#f97316', '#8b5cf6', '#ec4899', '#14b8a6', '#eab308'];
+
+const ProductivityChart: React.FC<ProductivityChartProps> = ({ data, collaborators }) => {
   // Exibe um placeholder se não houver dados para o gráfico.
-  if (!data || data.length === 0) {
+  if (!data || data.length === 0 || collaborators.length === 0) {
     return (
       <div className="bg-white rounded-xl shadow-lg p-6 flex items-center justify-center h-[362px]">
         <p className="text-gray-500">Sem dados para exibir.</p>
@@ -22,7 +26,7 @@ const ProductivityChart: React.FC<ProductivityChartProps> = ({ data }) => {
 
   return (
     <div className="bg-white rounded-xl shadow-lg p-6">
-      <h3 className="text-lg font-semibold text-gray-800">Evolução Diária</h3>
+      <h3 className="text-lg font-semibold text-gray-800">Evolução Diária por Colaborador</h3>
       <div className="flex items-center gap-2 text-sm text-gray-500 mb-4">
         <MousePointer2 size={16} />
         <span>Passe o mouse sobre o gráfico para ver detalhes.</span>
@@ -38,14 +42,17 @@ const ProductivityChart: React.FC<ProductivityChartProps> = ({ data }) => {
               border: '1px solid #ccc',
               borderRadius: '0.5rem',
             }}
-            // Formata o valor e o nome exibido na dica de contexto.
-            formatter={(value: number) => [`${value} itens`, 'Itens']}
             // Formata o rótulo do eixo X exibido na dica de contexto.
             labelFormatter={(label: string) => `Dia: ${label}`}
           />
           <Legend />
-          {/* Define a linha do gráfico, seus dados e aparência. */}
-          <Line type="monotone" dataKey="items" stroke="#3b82f6" strokeWidth={2} name="Itens" />
+          {/* Define as linhas do gráfico, uma para cada colaborador. */}
+          {collaborators.map((collab, index) => (
+            <Line 
+              key={collab} type="monotone" dataKey={collab} 
+              stroke={COLORS[index % COLORS.length]} strokeWidth={2} name={collab} 
+            />
+          ))}
         </LineChart>
       </ResponsiveContainer>
     </div>

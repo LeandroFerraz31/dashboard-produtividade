@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { TrendingUp, Package, Clock, Users, Calendar, AlertTriangle } from 'lucide-react';
+import { TrendingUp, Package, Clock, Users, Calendar, AlertTriangle, Target } from 'lucide-react';
 import Filters, { Period } from './Filters';
 import FileUpload from './FileUpload';
 import MetricCard from './MetricCard';
@@ -41,7 +41,8 @@ const ProductivityDashboard = () => {
     dailyData, 
     categoryData, 
     collaboratorComparison, 
-    collaboratorNames 
+    collaboratorNames,
+    dailyCollaboratorData
   } = useProductivityData(uploadedData, startDate, endDate, selectedCollaborator, collaborators);
 
   // Salva as alterações de estado no localStorage para persistência dos dados.
@@ -124,6 +125,10 @@ const ProductivityDashboard = () => {
     }
   };
 
+  // Define a meta diária e calcula o percentual de atingimento.
+  const dailyGoal = 650;
+  const goalAchievement = metrics.avgDaily > 0 ? (metrics.avgDaily / dailyGoal) * 100 : 0;
+
   return (
     <div className="min-h-screen bg-gradient-to-br from-blue-50 to-indigo-100 p-6">
       <div className="max-w-7xl mx-auto">
@@ -177,17 +182,18 @@ const ProductivityDashboard = () => {
         />
 
         {/* Cards de Métricas */}
-        <div className="grid grid-cols-1 md:grid-cols-5 gap-6 mb-6">
+        <div className="grid grid-cols-1 md:grid-cols-3 lg:grid-cols-6 gap-6 mb-6">
           <MetricCard icon={Package} title="Total Geral" value={metrics.grandTotalItems} description="Itens cadastrados (total)" color="from-red-500 to-red-600" />
           <MetricCard icon={Package} title="Total" value={metrics.totalItems} description="Itens cadastrados (período)" color="from-blue-500 to-blue-600" />
           <MetricCard icon={Calendar} title="Média" value={metrics.avgDaily.toFixed(1)} description="Itens por dia" color="from-green-500 to-green-600" />
           <MetricCard icon={Clock} title="Produtividade" value={metrics.avgHourly.toFixed(1)} description="Itens por hora" color="from-orange-500 to-orange-600" />
+          <MetricCard icon={Target} title="Meta Diária" value={`${goalAchievement.toFixed(1)}%`} description={`de ${dailyGoal} itens/dia`} color="from-teal-500 to-teal-600" />
           <MetricCard icon={Users} title="Período" value={metrics.totalDays} description="Dias trabalhados" color="from-purple-500 to-purple-600" />
         </div>
 
         {/* Gráficos */}
         <div className="grid grid-cols-1 lg:grid-cols-2 gap-6 mb-6">
-          <ProductivityChart data={dailyData} />
+          <ProductivityChart data={dailyCollaboratorData} collaborators={collaboratorNames.filter(c => c !== 'all')} />
           <CategoryChart data={categoryData} />
         </div>
 
