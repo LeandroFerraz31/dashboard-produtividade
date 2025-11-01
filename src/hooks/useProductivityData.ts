@@ -1,0 +1,121 @@
+import { useMemo } from 'react';
+
+
+interface RawData { [key: string]: any; }
+
+interface Collaborator {
+  name: string;
+  area: string;
+}
+
+// Hook customizado para processar e calcular todos os dados de produtividade.
+export const useProductivityData = (
+  uploadedData: RawData[],
+  startDate: string,
+  endDate: string,
+  selectedCollaborator: string,
+  collaborators: Collaborator[]
+) => {
+
+  const data = useMemo(() => {
+    return uploadedData;
+  }, [uploadedData]);
+
+  // Filtra os dados brutos com base no período e no colaborador selecionado.
+  const filteredData = useMemo(() => {
+    let filtered = data.filter(item => {
+      const itemDate = new Date(item.date);
+      const start = new Date(startDate);
+      const end = new Date(endDate);
+      return itemDate >= start && itemDate <= end;
+    });
+
+    if (selectedCollaborator !== 'all') {
+      filtered = filtered.filter(item => item.collaborator === selectedCollaborator);
+    }
+
+    return filtered;
+  }, [data, startDate, endDate, selectedCollaborator]);
+
+  // Calcula as métricas principais (totais, médias) com base nos dados filtrados.
+  const metrics = useMemo(() => {
+    const totalItems = filteredData.reduce((sum, item) => sum + item.items, 0);
+    const totalDays = new Set(filteredData.map(item => item.date)).size;
+    const grandTotalItems = data.reduce((sum, item) => sum + item.items, 0);
+    
+    const hoursPerDay = 8.8;
+
+    return {
+      totalItems,
+      avgDaily: totalDays > 0 ? (totalItems / totalDays) : 0,
+      avgHourly: totalDays > 0 ? (totalItems / (totalDays * hoursPerDay)) : 0,
+      totalDays,
+      grandTotalItems,
+    };
+  }, [filteredData, data]);
+
+  // Agrupa os dados por dia para o gráfico de evolução diária.
+  const dailyData = useMemo(() => {
+    const grouped: { [key: string]: number } = {};
+    filteredData.forEach(item => {
+      if (!grouped[item.date]) {
+        grouped[item.date] = 0;
+      }
+      grouped[item.date] += item.items;
+    });
+
+    return Object.entries(grouped).map(([date, items]) => ({
+      date: new Date(date).toLocaleDateString('pt-BR', { day: '2-digit', month: '2-digit' }),
+      items,
+    }));
+  }, [filteredData]);
+
+  // Agrupa os dados por categoria para o gráfico de distribuição.
+  const categoryData = useMemo(() => {
+    const grouped: { [key: string]: number } = {};
+    filteredData.forEach(item => {
+      if (!grouped[item.category]) {
+        grouped[item.category] = 0;
+      }
+      grouped[item.category] += item.items;
+    });
+
+    return Object.entries(grouped).map(([category, items]) => ({
+      name: category,
+      value: items as number,
+    }));
+  }, [filteredData]);
+
+  // Agrupa os dados por colaborador para o gráfico de comparação.
+  const collaboratorComparison = useMemo(() => {
+    const grouped: { [key: string]: number } = {};
+    filteredData.forEach(item => {
+      if (!grouped[item.collaborator]) {
+        grouped[item.collaborator] = 0;
+      }
+      grouped[item.collaborator] += item.items;
+    });
+
+    return Object.entries(grouped).map(([name, items]) => ({
+      name,
+      items,
+      avg: (items / (metrics.totalDays || 1)),
+    }));
+  }, [filteredData, metrics.totalDays]);
+
+  // Cria uma lista única de nomes de colaboradores para o filtro.
+  const collaboratorNames = useMemo(() => {
+    const namesFromData = new Set(data.map(item => item.collaborator));
+    const namesFromCollaborators = new Set(collaborators.map(c => c.name));
+    return ['all', ...Array.from(new Set([...namesFromData, ...namesFromCollaborators]))];
+  }, [data, collaborators]);
+
+  // Retorna todos os dados calculados para serem usados pelos componentes.
+  return { 
+    metrics, 
+    dailyData, 
+    categoryData, 
+    collaboratorComparison, 
+    collaboratorNames 
+  };
+};
