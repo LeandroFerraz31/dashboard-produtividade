@@ -22,18 +22,26 @@ const ProductivityDashboard = () => {
   const [startDate, setStartDate] = useState(formatDate(new Date()));
   const [endDate, setEndDate] = useState(formatDate(new Date()));
   const [selectedCollaborator, setSelectedCollaborator] = useState('all');
-  const [uploadedData, setUploadedData] = useState<RawData[]>(() => {
-    const savedData = localStorage.getItem('uploadedData');
-    return savedData ? JSON.parse(savedData) : [];
-  });
-  const [collaborators, setCollaborators] = useState<Collaborator[]>(() => {
-    const savedCollaborators = localStorage.getItem('collaborators');
-    return savedCollaborators ? JSON.parse(savedCollaborators) : [];
-  });
-  const [projectPlanData, setProjectPlanData] = useState(() => {
-    const savedPlan = localStorage.getItem('projectPlanData');
-    return savedPlan ? JSON.parse(savedPlan) : initialProjectPlan;
-  });
+  const [uploadedData, setUploadedData] = useState<RawData[]>([]);
+  const [collaborators, setCollaborators] = useState<Collaborator[]>([]);
+  const [projectPlanData, setProjectPlanData] = useState(initialProjectPlan);
+
+  // Carrega os dados do localStorage apenas no lado do cliente para evitar erros de SSR.
+  useEffect(() => {
+    try {
+      const savedData = localStorage.getItem('uploadedData');
+      if (savedData) setUploadedData(JSON.parse(savedData));
+
+      const savedCollaborators = localStorage.getItem('collaborators');
+      if (savedCollaborators) setCollaborators(JSON.parse(savedCollaborators));
+
+      const savedPlan = localStorage.getItem('projectPlanData');
+      if (savedPlan) setProjectPlanData(JSON.parse(savedPlan));
+    } catch (error) {
+      console.error("Failed to parse data from localStorage", error);
+      // Opcional: Limpar o localStorage se os dados estiverem corrompidos
+    }
+  }, []); // O array vazio garante que este efeito rode apenas uma vez, na montagem.
 
   // Processa e calcula os dados para exibição nos gráficos e métricas.
   const { 
@@ -123,6 +131,14 @@ const ProductivityDashboard = () => {
   const dailyGoal = 650;
   const goalAchievement = metrics.avgDaily > 0 ? (metrics.avgDaily / dailyGoal) * 100 : 0;
 
+  // Combina os dados de produtividade por colaborador com as datas correspondentes.
+  // O hook `useProductivityData` retorna `dailyCollaboratorData` sem a propriedade 'date',
+  // que é necessária para o `ProductivityChart`. Esta lógica corrige a estrutura dos dados.
+  const chartData = dailyData.map((day, index) => ({
+    date: day.date, // Adiciona a data do array `dailyData`
+    ...(dailyCollaboratorData[index] || {}), // Combina com os dados do colaborador para aquele dia
+  }));
+
   return (
     <div className="min-h-screen bg-gradient-to-br from-blue-50 to-indigo-100 p-6">
       <div className="max-w-7xl mx-auto">
@@ -187,7 +203,7 @@ const ProductivityDashboard = () => {
 
         {/* Gráficos */}
         <div className="grid grid-cols-1 lg:grid-cols-2 gap-6 mb-6">
-          <ProductivityChart data={dailyCollaboratorData} collaborators={collaboratorNames.filter(c => c !== 'all')} />
+          <ProductivityChart data={chartData} collaborators={collaboratorNames.filter(c => c !== 'all')} />
           <CategoryChart data={categoryData} />
         </div>
 
