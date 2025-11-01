@@ -26,8 +26,8 @@ const FileUpload: React.FC<FileUploadProps> = ({ onDataLoaded, collaborators }) 
 
   // Manipula o evento de upload, lendo e processando a planilha Excel.
   const handleFileUpload = (event: React.ChangeEvent<HTMLInputElement>) => {
-    const file = event.target.files?.[0];
-    if (!file) return;
+    const files = event.target.files;
+    if (!files || files.length === 0) return;
 
     if (!selectedCollaborator) {
       alert('Por favor, selecione um colaborador antes de carregar a planilha.');
@@ -35,74 +35,76 @@ const FileUpload: React.FC<FileUploadProps> = ({ onDataLoaded, collaborators }) 
       return;
     }
 
-    // Inicia a leitura assíncrona do arquivo em memória.
-    const reader = new FileReader();
+    const allDataFromFiles: any[] = [];
+    let filesProcessed = 0;
 
-    reader.onload = (e) => {
-      const arrayBuffer = e.target?.result;
-      if (!arrayBuffer) return;
+    const processFile = (file: File) => {
+      const reader = new FileReader();
+      reader.onload = (e) => {
+        const arrayBuffer = e.target?.result;
+        if (!arrayBuffer) return;
 
-      try {
-        // Converte o buffer do arquivo para um workbook da lib xlsx.
-        const workbook = XLSX.read(arrayBuffer, { type: 'array' });
-        const allData: any[] = [];
-        
-        // Define a expressão regular para extrair categoria e data do nome da aba.
-        const sheetNameRegex = /^(.*?) (\d{2}[.\/\-]\d{2}[.\/\-]\d{4})$/;
+        try {
+          const workbook = XLSX.read(arrayBuffer, { type: 'array' });
+          const fileData: any[] = [];
+          const sheetNameRegex = /^(.*?) (\d{2}[.\/\-]\d{2}[.\/\-]\d{4})$/;
+          for (const sheetName of workbook.SheetNames) {
+            const match = sheetName.trim().match(sheetNameRegex);
 
-        // Itera sobre cada aba (sheet) da planilha.
-        for (const sheetName of workbook.SheetNames) {
-          const match = sheetName.trim().match(sheetNameRegex);
+            if (!match) {
+              console.warn(`A aba "${sheetName}" no arquivo "${file.name}" não segue o formato esperado e será ignorada.`);
+              continue;
+            }
 
-          // Pula a aba se o nome não corresponder ao formato esperado.
-          if (!match) {
-            console.warn(`A aba "${sheetName}" não segue o formato esperado "Categoria DD-MM-AAAA" e será ignorada.`);
-            continue;
+            const category = match[1];
+            const dateStr = match[2].replace(/[.\/]/g, '-');
+            const dateParts = dateStr.split('-');
+            const isoDate = `${dateParts[2]}-${dateParts[1]}-${dateParts[0]}`;
+
+            const worksheet = workbook.Sheets[sheetName];
+            const json = XLSX.utils.sheet_to_json(worksheet);
+
+            const sheetData = json.map(() => ({
+              items: 1,
+              date: isoDate,
+              category: category,
+            }));
+
+            fileData.push(...sheetData);
           }
-
-          const category = match[1];
-          const dateStr = match[2].replace(/[.\/]/g, '-');
-          const dateParts = dateStr.split('-');
-          // Converte a data para o formato AAAA-MM-DD para consistência.
-          const isoDate = `${dateParts[2]}-${dateParts[1]}-${dateParts[0]}`;
-
-          const worksheet = workbook.Sheets[sheetName];
-          const json = XLSX.utils.sheet_to_json(worksheet);
-
-          // Mapeia cada linha da aba para um objeto de dados padronizado.
-          const sheetData = json.map(() => ({
-            items: 1, // Cada linha da planilha conta como 1 item.
-            date: isoDate,
-            category: category,
-          }));
-
-          allData.push(...sheetData);
+          allDataFromFiles.push(...fileData);
+        } catch (error) {
+          console.error(`Erro ao processar a planilha "${file.name}":`, error);
+          alert(`Ocorreu um erro ao processar a planilha "${file.name}". Verifique se o arquivo não está corrompido.`);
+        } finally {
+          filesProcessed++;
+          if (filesProcessed === files.length) {
+            if (allDataFromFiles.length === 0) {
+              alert('Nenhuma aba nas planilhas corresponde ao formato esperado "Categoria DD-MM-AAAA".\nNenhum dado foi carregado.');
+            } else {
+              onDataLoaded(allDataFromFiles, selectedCollaborator);
+              alert(`${files.length} planilha(s) processada(s) com sucesso!\nTotal de ${allDataFromFiles.length} itens carregados.`);
+            }
+            event.target.value = ''; // Limpa o input no final
+          }
         }
+      };
 
-        if (allData.length === 0) {
-          alert('Nenhuma aba na planilha corresponde ao formato esperado "Categoria DD-MM-AAAA".\nNenhum dado foi carregado.');
-          return;
+      reader.onerror = (error) => {
+        console.error(`Erro ao ler o arquivo "${file.name}":`, error);
+        alert(`Ocorreu um erro ao ler o arquivo "${file.name}".`);
+        filesProcessed++;
+        if (filesProcessed === files.length) {
+          // Finaliza mesmo se um arquivo der erro
+          onDataLoaded(allDataFromFiles, selectedCollaborator);
         }
-
-        // Envia os dados processados para o componente pai.
-        onDataLoaded(allData, selectedCollaborator);
-        alert(`Dados de ${allData.length > 0 ? (new Set(allData.map(d => d.date))).size : 0} abas processados com sucesso!`);
-
-      } catch (error) {
-        console.error("Erro ao processar a planilha:", error);
-        alert("Ocorreu um erro ao processar a planilha. Verifique se o arquivo não está corrompido.");
-      } finally {
-        // Limpa o input para permitir o upload do mesmo arquivo novamente.
-        event.target.value = '';
-      }
+      };
+      reader.readAsArrayBuffer(file);
     };
 
-    reader.onerror = (error) => {
-      console.error("Error reading file:", error);
-      alert("Ocorreu um erro ao ler o arquivo.");
-    };
-
-    reader.readAsArrayBuffer(file);
+    for (let i = 0; i < files.length; i++) {
+      processFile(files[i]);
+    }
   };
 
   return (
@@ -152,6 +154,7 @@ const FileUpload: React.FC<FileUploadProps> = ({ onDataLoaded, collaborators }) 
                     id="file-upload-input"
                     type="file" 
                     accept=".xlsx, .xls"
+                    multiple // Permite a seleção de múltiplos arquivos
                     onChange={handleFileUpload} 
                     className="block w-full text-sm text-gray-500 file:mr-4 file:py-2 file:px-4 file:rounded-full file:border-0 file:text-sm file:font-semibold file:bg-blue-50 file:text-blue-700 hover:file:bg-blue-100 disabled:opacity-50"
                     disabled={!selectedCollaborator}

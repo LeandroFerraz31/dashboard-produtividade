@@ -98,21 +98,15 @@ const ProductivityDashboard = () => {
     setCollaborators(prev => prev.filter(c => c.name !== name));
   };
 
-  // Processa os dados da planilha e substitui os dados do colaborador.
+  // Processa os dados da(s) planilha(s) e os adiciona aos dados existentes.
   const handleDataLoaded = (newData: RawData[], collaboratorName: string) => {
     const taggedData = newData.map(row => ({
         ...row,
         'collaborator': collaboratorName
     }));
 
-    setUploadedData(prevData => {
-      // Filtra os dados, mantendo apenas os de outros colaboradores.
-      const otherCollaboratorsData = prevData.filter(
-        row => row.collaborator !== collaboratorName
-      );
-      // Retorna os dados dos outros junto com os novos dados do colaborador atual.
-      return [...otherCollaboratorsData, ...taggedData];
-    });
+    // Adiciona os novos dados ao estado existente, sem remover os antigos.
+    setUploadedData(prevData => [...prevData, ...taggedData]);
   };
 
   // Limpa todos os dados do localStorage e recarrega a aplicação.
